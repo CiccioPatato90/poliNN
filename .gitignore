@@ -1,3 +1,5 @@
 local/*
 pycache/
 res/
+__pycache__/
+main_2.L.py
