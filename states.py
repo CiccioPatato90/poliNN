@@ -1,14 +1,14 @@
 import torch
-from torch import nn
+from torch import nn, Tensor
 import numpy as np
-import torch
-from torch import nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
 import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+from sklearn.metrics import confusion_matrix, precision_score, recall_score, f1_score, balanced_accuracy_score, classification_report
 from typing import Tuple, List, Optional
 import torch.nn.functional as F
+from torch.utils.data import TensorDataset,random_split
 
 # Step 5: Create custom dataset
 class EnergyConsumptionDataset(Dataset):
@@ -23,40 +23,83 @@ class EnergyConsumptionDataset(Dataset):
         return self.inputs[idx], self.labels[idx]
 
 class Actions():
-    def __init__(self, inputs, labels):
-        self.dataset = EnergyConsumptionDataset(inputs, labels)
+    def __init__(self, features_tensor: Tensor, labels_tensor: Tensor, num_records, batch_size):
+        self.dataset = TensorDataset(features_tensor, labels_tensor)
+        self.features_tensor = features_tensor
+        self.labels_tensor = labels_tensor
+        # Split dataset
+        gen = torch.Generator().manual_seed(9)
+        train_size = int(0.7 * num_records)
+        test_size = num_records - train_size
+        train_dataset, test_dataset = random_split(self.dataset, [train_size, test_size], gen)
+        
+        # Create DataLoaders
+        self.train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+        self.test_loader = DataLoader(test_dataset, batch_size=batch_size)
 
-    def train_model(model: nn.Module, train_loader: DataLoader, criterion: nn.Module, optimizer: optim.Optimizer, num_epochs: int) -> None:
-        for epoch in range(num_epochs):
-            model.train()  # Set the model to training mode
-            running_loss = 0.0
+    def compute_class_weights(labels):
+        # Calculate the frequency of each class
+        class_sample_count = torch.bincount(labels)
+        # Invert the frequencies: less frequent classes get higher weight
+        class_weights = 1.0 / class_sample_count.float()
+        return class_weights
+    
+    def get_input_size(self):
+        return self.features_tensor.size(dim=1)
+
+    def get_num_unique_labels(self):
+        return len(torch.unique(self.labels_tensor))
+    def get_unique_labels(self):
+        print(torch.unique(self.labels_tensor))
+        return torch.unique(self.labels_tensor)
+    def get_device(self):
+        device = (
+            "cuda"
+            if torch.cuda.is_available()
+            else "mps"
+            if torch.backends.mps.is_available()
+            else "cpu"
+        )
+        print(f"Using {device} device")
+        return device
+
+    def train_model(model: nn.Module, train_loader: DataLoader, criterion: nn.Module, optimizer: optim.Optimizer) -> None:
+        model.train()
+        n_epochs = 50
+        for epoch in range(n_epochs):
             for inputs_batch, labels_batch in train_loader:
-                
-                # Debug statements
-                if inputs_batch.device.type != 'cpu' or labels_batch.device.type != 'cpu':
-                    print(f"Warning: Inputs or labels are not on CPU. Inputs device: {inputs_batch.device}, Labels device: {labels_batch.device}")
-
+                # Forward pass: compute the model prediction (no need for slicing)
                 optimizer.zero_grad()
-                outputs = model(inputs_batch)
-                loss = criterion(outputs, labels_batch)
+                y_pred = model(inputs_batch)
+                # Compute the loss
+                loss = criterion(y_pred, labels_batch)
                 loss.backward()
                 optimizer.step()
-                running_loss += loss.item() * inputs_batch.size(0)
-            epoch_loss = running_loss / len(train_loader.dataset)
-            print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {epoch_loss:.4f}')
+            print(f'Finished epoch {epoch}, latest loss {loss}')
+
 
 
     def evaluate_model(model: nn.Module, test_loader: DataLoader, class_names: Optional[List[str]] = None) -> Tuple[float, np.ndarray]:
-        model.eval()  # Set the model to evaluation mode
+        model.eval()  # Disable dropout for evaluation
+
         all_preds = []
         all_labels = []
-
         with torch.no_grad():
             for inputs_batch, labels_batch in test_loader:
                 outputs = model(inputs_batch)
-                _, predicted = torch.max(outputs.data, 1)
+                
+                _, predicted = torch.max(outputs, 1)
                 all_preds.extend(predicted.cpu().numpy())
                 all_labels.extend(labels_batch.cpu().numpy())
+
+            print(all_preds[:5])
+
+            # Check the distribution of true labels and predicted labels
+        unique_labels, counts_labels = np.unique(all_labels, return_counts=True)
+        print(f"True labels distribution: {dict(zip(unique_labels, counts_labels))}")
+
+        unique_preds, counts_preds = np.unique(all_preds, return_counts=True)
+        print(f"Predicted labels distribution: {dict(zip(unique_preds, counts_preds))}")
 
         # Compute accuracy
         correct = np.sum(np.array(all_preds) == np.array(all_labels))
@@ -81,47 +124,19 @@ class Actions():
         plt.title('Confusion Matrix')
         plt.show()
 
-        return accuracy, cm        
+        # Compute additional metrics: precision, recall, F1-score
+        precision = precision_score(all_labels, all_preds, average='weighted')
+        recall = recall_score(all_labels, all_preds, average='weighted')
+        f1 = f1_score(all_labels, all_preds, average='weighted')
+        balanced_acc = balanced_accuracy_score(all_labels, all_preds)
 
-class FocalLoss(nn.Module):
-    def __init__(self, alpha=None, gamma=2, reduction='mean'):
-        """
-        Parameters:
-            alpha (Tensor, optional): Class weights. Shape [num_classes].
-            gamma (float, optional): Focusing parameter gamma >= 0.
-            reduction (str, optional): 'mean', 'sum', or 'none'.
-        """
-        super(FocalLoss, self).__init__()
-        self.alpha = alpha  # Class weights
-        self.gamma = gamma
-        self.reduction = reduction
+        print(f'Precision: {precision:.2f}')
+        print(f'Recall: {recall:.2f}')
+        print(f'F1-Score: {f1:.2f}')
+        print(f'Balanced Accuracy: {balanced_acc:.2f}')
 
-    def forward(self, inputs, targets):
-        """
-        Args:
-            inputs (Tensor): Raw model outputs (logits) of shape [batch_size, num_classes].
-            targets (Tensor): Ground truth labels of shape [batch_size].
-        """
+        # Print classification report
+        print("\nClassification Report:")
+        print(classification_report(all_labels, all_preds, target_names=class_names))
 
-        log_probs = F.log_softmax(inputs, dim=1)
-        probs = torch.exp(log_probs)
-        targets_one_hot = F.one_hot(targets, num_classes=inputs.size(1)).float()
-        pt = (probs * targets_one_hot).sum(dim=1)
-
-
-        # Compute Cross Entropy Loss without reduction
-        ce_loss = F.cross_entropy(inputs, targets, weight=self.alpha, reduction='none')
-
-        # Get the probability of the true class
-        #pt = torch.exp(-ce_loss)
-
-        # Compute the focal loss
-        focal_loss = ((1 - pt) ** self.gamma) * ce_loss
-
-        # Apply reduction method
-        if self.reduction == 'mean':
-            return focal_loss.mean()
-        elif self.reduction == 'sum':
-            return focal_loss.sum()
-        else:
-            return focal_loss
+        return accuracy, cm    

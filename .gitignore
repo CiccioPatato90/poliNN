@@ -1,3 +1,5 @@
-local/*
+local/
 pycache/
 res/
+__pycache__/
+records.db
