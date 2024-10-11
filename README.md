@@ -6,3 +6,4 @@ to run the project:
 
 - Main branch is behind, current project is on branch "simple_net"
 - Run git checkout simple_net and do the steps above
+- main_2.L.py has a script that currently run in production doing k-means clustering. The aim is to replace it with the nn
