@@ -22,7 +22,7 @@ def plot_correlation_heatmap(df: pd.DataFrame):
     plt.figure(figsize=(12, 10))
     sns.heatmap(correlation_matrix, annot=True, fmt=".2f", cmap='coolwarm', linewidths=0.5)
     plt.title('Correlation Heatmap of Features', fontsize=16)
-    plt.show()
+    plt.savefig('eval/correlation_heatmap.png')
 
 # 3. Class Distribution
 def plot_class_distribution(df):
@@ -42,6 +42,12 @@ def plot_boxplots(df):
     plt.xlabel('Feature Value')
     plt.ylabel('Features')
     plt.show()
+    
+def plot_clustermap(df):
+    plt.figure(figsize=(12, 10))
+    sns.clustermap(df.corr(), cmap='coolwarm', annot=True, fmt=".2f", linewidths=0.5)
+    plt.title('Clustermap of Correlation Matrix')
+    plt.savefig('eval/clustermap.png')
 
 import numpy as np
 import pandas as pd

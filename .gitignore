@@ -1,5 +1,11 @@
 local/
 pycache/
+eval/
 res/
 __pycache__/
 records.db
+.venv/
+main_2.L.py
+netdebugger-r51/
+netdebugger/
+__pycache__/
