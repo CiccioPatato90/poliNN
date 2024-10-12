@@ -69,7 +69,7 @@ optimizer = optim.Adam(model.parameters(), lr=0.025)
 
 Actions.train_model(model, action.train_loader, criterion, optimizer, device=device)
 
-cm = Actions.evaluate_model(model, action.test_loader, class_names=action.get_unique_labels, device=device)
+cm = Actions.evaluate_model(model, action.test_loader, class_names=action.get_unique_labels(), device=device)
 
 # Save the model
 #torch.save(model.state_dict(), 'feedfwdnet.pth')
