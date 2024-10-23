@@ -3,7 +3,7 @@ from numba import jit
 import time
 from functools import wraps
 
-def print_debug(data_list,info, num_elements=1):
+def print_debug(data_list,info="[empty]", num_elements=1):
     if num_elements > len(data_list):
         print(f"Requested {num_elements} elements, but the list only has {len(data_list)}.")
         num_elements = len(data_list)  # Limit to the size of the list
@@ -31,7 +31,6 @@ def to_binary(one_hot):
     index = np.where(one_hot == 1)[0][0]
     return index
 
-@jit(nopython=True)
 def to_one_hot(binary, len_labels) -> np.ndarray:
     """ Encode the label into one-hot format. """
     res = np.zeros(len_labels, dtype=int)

@@ -5,22 +5,8 @@ from constants import *
 import random
 from typing import List, Dict
 import utils as ut
-
-class ValueInfo:
-    def __init__(self):
-        self.total: int = 0
-        self.values: np.ndarray = np.array([])  # NumPy array for faster processing
-        self.cluster_one_hot: np.ndarray = np.array([])
-
-class ValuesDict:
-    def __init__(self):
-        #self.total: int = 0
-        self.values_dict: Dict[int, ValueInfo] = {
-            0: ValueInfo(),
-            1: ValueInfo(),
-            2: ValueInfo(),
-            3: ValueInfo(),
-        }
+import pandas as pd
+from classes import ValuesDict, MetadataDict
 
 class Data:
     def __init__(self):
@@ -28,6 +14,23 @@ class Data:
         self.total_values: ValuesDict = ValuesDict()
         self.train_values: ValuesDict = ValuesDict()
         self.test_values: ValuesDict = ValuesDict()
+        self.metadata: MetadataDict = MetadataDict()
+
+    def pickle_dump(self):
+        # Cache the dataset using pickle
+        with open(CACHE_DIR, 'wb') as f:
+            pickle.dump(self, f)
+
+    def update_metadata(self, pds: pd.DataFrame, binary_label):
+        self.metadata.values_dict[int(binary_label)].mean = pds.mean()
+        self.metadata.values_dict[int(binary_label)].median = pds.median()
+        self.metadata.values_dict[int(binary_label)].std = pds.std()
+        self.metadata.values_dict[int(binary_label)].var = pds.var()
+        self.metadata.values_dict[int(binary_label)].min = pds.min()
+        self.metadata.values_dict[int(binary_label)].max = pds.max()
+        self.metadata.values_dict[int(binary_label)].range = (pds.max() - pds.min())
+        self.metadata.values_dict[int(binary_label)].skewness = pds.skew()
+        self.metadata.values_dict[int(binary_label)].sum_squared_errors = np.sum((pds - pds.mean())**2).sum()
 
     def init_pickle(self, labels):
         """ 
@@ -46,9 +49,29 @@ class Data:
             self.total_values.values_dict[int(label)].cluster_one_hot = encoded_label
             self.total_values.values_dict[int(label)].values = np.array(cluster_data)
 
-        # Cache the dataset using pickle
-        with open(CACHE_DIR, 'wb') as f:
-            pickle.dump(self, f)
+            pds = pd.DataFrame(cluster_data)
+            self.update_metadata(pds, label)
+            self.pickle_dump()
+
+    def info(self, clusters, filename):
+        with open(CACHE_DIR, 'rb') as f:
+            data_instance: Data = pickle.load(f)
+            data_instance.metadata.print(clusters=clusters, file=filename)
+            
+    def analyze(self, clusters, filename):
+        with open(CACHE_DIR, 'rb') as f:
+            data_instance: Data = pickle.load(f)
+            for cluster in clusters:
+                new_cluster = data_instance.total_values.values_dict[int(cluster)].analyze(file=filename, metadata=data_instance.metadata.values_dict[int(cluster)])
+                self.total_values.values_dict[int(cluster)].values = np.array(new_cluster)
+                self.total_values.values_dict[int(cluster)].total = len(np.array(new_cluster))
+                encoded_label = ut.to_one_hot(cluster, 4)
+                self.total_values.values_dict[int(cluster)].cluster_one_hot = encoded_label
+                self.update_metadata(pd.DataFrame(new_cluster), cluster)
+                self.pickle_dump()
+
+
+
 
     def split(self, proportion=0.5, verbose=False):
         """
@@ -57,8 +80,6 @@ class Data:
         # Load the cached data
         with open(CACHE_DIR, 'rb') as f:
             data_instance: Data = pickle.load(f)
-
-        print("Total count:", data_instance.total_count)
 
         for label, cluster in data_instance.total_values.values_dict.items():
             cluster_size = cluster.total

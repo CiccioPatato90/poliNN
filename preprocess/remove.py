@@ -3,7 +3,7 @@ import sqlite3
 import numpy as np
 from collections import defaultdict
 
-LABEL_O_MAX_SIZE = 60000
+LABEL_O_MAX_SIZE = 200000
 
 def parse_float(value):
     if value:
