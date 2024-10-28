@@ -1,4 +1,5 @@
 CACHE_DIR = "./cache/clustered_data"
+NO_OUTLIERS_CACHE_DIR = "./cache/clustered_data_no_outliers"
 CACHE_NAME = "clustered_data"
 DB_DIR = "res/records.db"
 METADATA_FILE = "res/metadata.txt"

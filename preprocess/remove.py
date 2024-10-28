@@ -79,6 +79,7 @@ with open('res/k_means.csv', "r", newline='', encoding='utf-8') as csvfile_in, \
             label = row['LABEL']  # Get the label for this specific row
             if label == "0":
                 count_0 += 1
+            #if the label is 0 and we already reached max number of records for cluster 0, skip the record
             if label == "0" and count_0 > LABEL_O_MAX_SIZE:
                 exec = False
 

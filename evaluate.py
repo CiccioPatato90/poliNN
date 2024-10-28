@@ -1,48 +1,59 @@
 from imports import *
 from constants import *
-from collections import Counter
 import pickle
-from matplotlib import pyplot
+import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn as sns
 import utils as ut
 
-def cross_correlation(self, cluster_pairs):
-        import pandas as pd
-        import matplotlib.pyplot as plt
-        import seaborn as sns
-
-        with open(CACHE_DIR, 'rb') as f:
+def cross_correlation(cluster_pairs, cache_dir):
+        with open(cache_dir, 'rb') as f:
             data_instance = pickle.load(f)
+
+            for cluster_a, cluster_b in cluster_pairs:
+                # Retrieve the two clusters
+                data_a = data_instance.total_values.values_dict[cluster_a].values
+                data_b = data_instance.total_values.values_dict[cluster_b].values
+
+                # Compute correlation matrices
+                df1 = pd.DataFrame(data_a)
+                df2 = pd.DataFrame(data_b)
+                corr_series = df1.corrwith(df2)
+    
+                # Plot the correlation values
+                plt.figure(figsize=(10, 6))
+                corr_series.plot(kind='bar', color='skyblue')
+                plt.title(f"Column-wise Correlation between Cluster {cluster_a} and Cluster {cluster_b}")
+                plt.xlabel("Columns")
+                plt.ylabel("Correlation")
+                plt.xticks(rotation=45)
+                plt.savefig(f"./res/img/linear_correlation_{cluster_a}_{cluster_b}_(no_outliers)")
+            exit()
+
+# Function to plot scatter plots for each column in df1 vs corresponding column in df2
+def plot_scatter(cluster_pairs):
+    with open(CACHE_DIR, 'rb') as f:
+        data_instance = pickle.load(f)
 
         for cluster_a, cluster_b in cluster_pairs:
             # Retrieve the two clusters
-            print("a", cluster_a)
-            print("b", cluster_b)
             data_a = data_instance.total_values.values_dict[cluster_a].values
             data_b = data_instance.total_values.values_dict[cluster_b].values
 
-            ut.print_debug(data_a, num_elements=5)
-            ut.print_debug(data_b, num_elements=5)
+            # Compute correlation matrices
+            df1 = pd.DataFrame(data_a)
+            df2 = pd.DataFrame(data_b)
+            num_columns = df1.shape[1]
+            fig, axes = plt.subplots(4, 6, figsize=(18, 12))
+            axes = axes.ravel()
             
-            # Check if the clusters have different sizes and handle accordingly
-            min_size = min(len(data_a), len(data_b))
-            data_a = data_a[:min_size]
-            data_b = data_b[:min_size]
+            for i in range(num_columns):
+                axes[i].scatter(df1.iloc[:, i], df2.iloc[:, i], alpha=0.5)
+                axes[i].set_title(f"Column {i}")
+                axes[i].set_xlabel("df1")
+                axes[i].set_ylabel("df2")
             
-            # Combine the two clusters into a DataFrame for correlation
-            if isinstance(data_a, np.ndarray):
-                data_a = pd.DataFrame(data_a)
-            if isinstance(data_b, np.ndarray):
-                data_b = pd.DataFrame(data_b)
-            
-            combined_data = pd.concat([data_a, data_b], axis=1, ignore_index=True)
-            
-            # Calculate the correlation matrix
-            corr_matrix = combined_data.corr()
-            
-            # Plot the correlation matrix
-            plt.figure(figsize=(8, 6))
-            sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', fmt='.2f')
-            plt.title(f'Correlation between Cluster {cluster_a} and Cluster {cluster_b}')
+            plt.tight_layout()
             plt.show()
 
 def bar_chart_binary(x: np.array, info: str):    
@@ -57,8 +68,8 @@ def bar_chart_binary(x: np.array, info: str):
     plt.bar(map_count.keys(), map_count.values())
     plt.xlabel('Class')
     plt.ylabel('Number of Samples')
-    plt.title('Class Distribution in Dataset')
-    plt.savefig(f"./res/{info}")
+    plt.title(f'Class Distribution ({info}) in Dataset')
+    plt.savefig(f"./res/img/{info}")
     plt.close()
 
 @ut.time_it
@@ -77,5 +88,5 @@ def bar_chart_one_hot(x: np.array, info: str):
     plt.xlabel('Class')
     plt.ylabel('Number of Samples')
     plt.title(f'Class Distribution ({info}) in Dataset')
-    plt.savefig(f"./res/{info}")
+    plt.savefig(f"./res/img/{info}")
     plt.close()
