@@ -1,116 +1,120 @@
-#from imports import *
 from db import Database
-import numpy as np
-from sklearn.model_selection import train_test_split
-from tensorflow.python.keras.layers import Dense, Activation
-from tensorflow.python.keras.models import Sequential
-from tensorflow.python.keras.callbacks import EarlyStopping
-from engines_old import evaluate
-import shelve
+import utils as ut
+import evaluate
 from constants import *
+from preprocess.split import Data
+from classes import Model
+
+from sklearn.model_selection import train_test_split
+
+import numpy as np
 
 
 db = Database('res/records.db')
-data = db.fetch_all()
-num_records = len(data)
-#db.close_conn()
 
-# Split data into features and labels
-dfs = np.split(data, [24], axis=1)
-
-# FORMAT: [0.06  0.097 0.064 0.059 0.059 0.097 0.061 0.057 0.057 0.095 0.058 0.059
-# 0.07  0.087 0.054 0.055 0.089 0.067 0.068 0.066 0.09  0.058 0.056 0.087]
-X = dfs[0]
-# FORMAT: [1.] [1.] [1.] [2.] [3.]
-y = dfs[1]
-
-#numpy arrays
-#print("FEATURES (NUMPY) :", X[1:2])
-#print("LABELS (NUMPY) :", y[1:2])
-
-from sklearn.preprocessing import LabelEncoder
-#from keras import utils as ut
-import utils as ut
-
-# Assuming 'y' is your LABEL column
-label_encoder = LabelEncoder()
-y_encoded = label_encoder.fit_transform(y)  # NOT NEEDED
-#print(y_encoded[10:13])
-
-#[1, 0, 0, 0] ... [0, 0, 0, 1]
-#y_categorical = ut.to_categorical(y)  # One-hot encode
-#print("converting to one-hot encoding: ", y_categorical[300:301])
-
-model = Sequential()
-model.add(Dense(16, input_dim=len(X[0]), activation=None))
-model.add(Dense(4, activation='softmax'))  # 4 output classes
-
-monitor = EarlyStopping(monitor='val_loss', min_delta=1e-3, patience=5, 
-                        verbose=1, mode='auto', restore_best_weights=True)
-
-model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
-
-from preprocess.split import Data
-# Initialize the Data object
-data_instance = Data()
-# Call the init method example
 if False:
-    data_instance.init_pickle([0,1,2,3])
+    #create db relation to efficiently fetch one_hot_encoding at db level
+    db.create_label_conversion()
     exit()
-data_instance.split(proportion=0.8)
 
-#data_instance.print_results()
-
-train, test = data_instance.extract_train_test()
-
-X_train, y_train = zip(*train)
-X_test, y_test = zip(*test)
-
-# Convert to NumPy arrays if necessary
-X_train = np.array(X_train)
-y_train = np.array(y_train)
-X_test = np.array(X_test)
-y_test = np.array(y_test)
+data_instance = Data()
 
 if False:
-    ut.print_debug(X_train, info="X_train", num_elements=5)
-    ut.print_debug(X_test, info="X_test", num_elements=5)
-    ut.print_debug(y_train, info="y_train", num_elements=5)
-    ut.print_debug(y_test, info="y_test", num_elements=5)
+    # 1. fetch data divided by cluster from db
+    # 2. calculate metadata (mean, std, var ..) + populate total_values
+    # 3. cache result
+    data_instance.init_pickle([0,1,2,3], db)
 
-#X_train, X_test, y_train, y_test = train_test_split(X, y_categorical, test_size=0.2, stratify=y,random_state=42)
+    # exiting bc need to do it only once, or upon db data change
+    exit()
+
+# analyze cluster 
+# generate metadata info (res/metadata.txt)
+if False:
+    data_instance.info([0,1,2,3], METADATA_FILE)
+    data_instance.analyze([0,1,2,3], "res/analysis.txt", clean=True, outliers_threshold=15)
+    data_instance.info([0,1,2,3], "res/cleaned.txt", cache_dir=NO_OUTLIERS_CACHE_DIR)
+
+    #pass cache dir to tell it where to save the test and train splits
+    data_instance.sklearn_split(db,test_size=0.3, random=False, debug=True, cache_dir=NO_OUTLIERS_CACHE_DIR)
+    exit()
+
+evaluate.cross_correlation([(0,3), (0, 1), (0,2)], cache_dir=NO_OUTLIERS_CACHE_DIR)
+
+if True:
+    X_train, y_train, X_test, y_test = data_instance.extract_train_test_db(db)
+    
+    """
+    X_train, y_train = zip(*train)
+    X_test, y_test = zip(*test)
+    """
+
+    # Convert to NumPy arrays if necessary
+    X_train = np.array(X_train)
+    y_train = np.array(y_train)
+    X_test = np.array(X_test)
+    y_test = np.array(y_test)
+
+if True:
+    ut.print_debug(X_train, info="X_train", num_elements=2)
+    ut.print_debug(X_test, info="X_test", num_elements=2)
+    ut.print_debug(y_train, info="y_train", num_elements=2)
+    ut.print_debug(y_test, info="y_test", num_elements=2)
+
+
 # Riscrivere la funzione di split del dataset poichè le proporzioni non vengono mantenute
 # SHOW CLASS DISTRIBUTION
-evaluate.histogram_binary(y, 'pre')
-evaluate.histogram_one_hot(y_train, 'train')
-evaluate.histogram_one_hot(y_test, 'test')
+#evaluate.bar_chart_binary(y, 'pre')
+evaluate.bar_chart_one_hot(y_train, 'train')
+evaluate.bar_chart_one_hot(y_test, 'test')
 
-model.fit(X_train, y_train, epochs=20, batch_size=64,validation_data=(X_test, y_test))
+#model init, need to pass input and output dim from Data()
+model = Model(input_dim=len(X_train[0]), output_dim=4)
 
-loss, accuracy = model.evaluate(X_test, y_test)
+model.model.fit(X_train, y_train, epochs=10, batch_size=32, validation_data=(X_test, y_test))
+
+loss, accuracy = model.model.evaluate(X_test, y_test)
 print(f'Test Accuracy: {accuracy}')
 print(f'Test Loss: {loss}')
 
-pred = model.predict(X_test)
-
-ut.print_debug(pred, info="pred", num_elements=15)
+pred = model.model.predict(X_test)
+ut.print_debug(pred, info="pred_one_hot", num_elements=1)
+print("800th one_hot ", pred[800])
 pred = np.argmax(pred,axis=1) 
+print("800th argmax ", pred[800])
+ut.print_debug(pred, info="pred", num_elements=1)
+# Extract false positives and false negatives for each class
+
+n_false_positives = np.zeros(4)
+n_false_negatives = np.zeros(4)
+# Loop over true and predicted labels
+y_compare = np.argmax(y_test,axis=1) 
+for true_label, pred_label in zip(y_compare, pred):
+    if true_label != pred_label:
+        # Increase false positives for the predicted class
+        n_false_positives[pred_label] += 1
+        # Increase false negatives for the true class
+        n_false_negatives[true_label] += 1
+
+# Print the results
+for i in range(4):
+    print(f"False Positives for class {i} : {n_false_positives[i]}")
+    print(f"False Negatives for class {i} : {n_false_negatives[i]}")
+
 
 from sklearn import metrics
-y_compare = np.argmax(y_test,axis=1) 
+
 score = metrics.accuracy_score(y_compare, pred)
 print("Accuracy score: {}".format(score))
 
 
 import numpy as np
-from sklearn import svm, datasets
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import confusion_matrix
 np.set_printoptions(precision=4)
 np.set_printoptions(suppress=True)
 
 # Compute confusion matrix
-cm = confusion_matrix(y_compare, pred)
+cm = metrics.confusion_matrix(y_compare, pred, normalize='all')
+print(cm)
 np.set_printoptions(precision=2)
 
 # Normalize the confusion matrix by row (i.e by the number of samples

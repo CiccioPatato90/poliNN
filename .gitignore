@@ -1,9 +1,10 @@
 local/
 pycache/
 eval/
-res/
-__pycache__/
+res/k_means.csv
+res/processed_data.csv
 records.db
+__pycache__/
 .venv/
 main_2.L.py
 netdebugger-r51/
