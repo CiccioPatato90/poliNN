@@ -149,7 +149,6 @@ class MetadataDict:
                     f.write("\n"+"=" * 80 + "\n\n")
 
 
-
 from tensorflow.python.keras.layers import Dense
 from tensorflow.python.keras.models import Sequential
 from tensorflow.python.keras.callbacks import EarlyStopping
@@ -159,4 +158,3 @@ class Model:
         self.model.add(Dense(4, input_dim=input_dim, activation=None))
         self.model.add(Dense(output_dim, activation='softmax'))
         self.model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
-

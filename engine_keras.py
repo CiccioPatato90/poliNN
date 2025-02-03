@@ -5,17 +5,15 @@ from constants import *
 from preprocess.split import Data
 from classes import Model
 
-from sklearn.model_selection import train_test_split
-
 import numpy as np
 
 
 db = Database('res/records.db')
 
-if False:
+if True:
     #create db relation to efficiently fetch one_hot_encoding at db level
     db.create_label_conversion()
-    exit()
+    
 
 data_instance = Data()
 
@@ -24,9 +22,8 @@ if False:
     # 2. calculate metadata (mean, std, var ..) + populate total_values
     # 3. cache result
     data_instance.init_pickle([0,1,2,3], db)
-
     # exiting bc need to do it only once, or upon db data change
-    exit()
+    
 
 # analyze cluster 
 # generate metadata info (res/metadata.txt)
@@ -35,11 +32,12 @@ if False:
     data_instance.analyze([0,1,2,3], "res/analysis.txt", clean=True, outliers_threshold=15)
     data_instance.info([0,1,2,3], "res/cleaned.txt", cache_dir=NO_OUTLIERS_CACHE_DIR)
 
-    #pass cache dir to tell it where to save the test and train splits
-    data_instance.sklearn_split(db,test_size=0.3, random=False, debug=True, cache_dir=NO_OUTLIERS_CACHE_DIR)
-    exit()
+#pass cache dir to tell it where to save the test and train splits
+data_instance.sklearn_split(db,test_size=0.3,random=False, debug=True, cache_dir=NO_OUTLIERS_CACHE_DIR)
+    
 
-evaluate.cross_correlation([(0,3), (0, 1), (0,2)], cache_dir=NO_OUTLIERS_CACHE_DIR)
+#evaluate.calcu_mutual_information(db)
+#evaluate.cross_correlation([(0,3), (0, 1), (0,2)], cache_dir=NO_OUTLIERS_CACHE_DIR)
 
 if True:
     X_train, y_train, X_test, y_test = data_instance.extract_train_test_db(db)
@@ -62,8 +60,6 @@ if True:
     ut.print_debug(y_test, info="y_test", num_elements=2)
 
 
-# Riscrivere la funzione di split del dataset poichè le proporzioni non vengono mantenute
-# SHOW CLASS DISTRIBUTION
 #evaluate.bar_chart_binary(y, 'pre')
 evaluate.bar_chart_one_hot(y_train, 'train')
 evaluate.bar_chart_one_hot(y_test, 'test')
@@ -71,7 +67,23 @@ evaluate.bar_chart_one_hot(y_test, 'test')
 #model init, need to pass input and output dim from Data()
 model = Model(input_dim=len(X_train[0]), output_dim=4)
 
-model.model.fit(X_train, y_train, epochs=10, batch_size=32, validation_data=(X_test, y_test))
+history = model.model.fit(X_train, y_train, epochs=100, batch_size=32, validation_data=(X_test, y_test), use_multiprocessing=True,
+    workers=8)
+
+# Plot training history
+import matplotlib.pyplot as plt
+plt.figure(figsize=(10, 5))
+plt.grid(True, linestyle='--', alpha=0.7)
+plt.plot(history.history['accuracy'], label='Training Accuracy')
+plt.plot(history.history['val_accuracy'], label='Validation Accuracy')
+plt.plot(history.history['loss'], label='Training Loss')
+plt.plot(history.history['val_loss'], label='Validation Loss')
+plt.xlabel('Epochs')
+plt.ylabel('Metrics')
+plt.legend()
+plt.title('Training and Validation Metrics Over Epochs')
+plt.savefig("train_history.png")
+plt.show()
 
 loss, accuracy = model.model.evaluate(X_test, y_test)
 print(f'Test Accuracy: {accuracy}')
@@ -106,6 +118,9 @@ from sklearn import metrics
 
 score = metrics.accuracy_score(y_compare, pred)
 print("Accuracy score: {}".format(score))
+
+from sklearn.metrics import classification_report
+print(classification_report(y_compare, pred))
 
 
 import numpy as np

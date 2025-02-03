@@ -1,10 +1,9 @@
 import numpy as np
-from numba import jit
 import time
 import json
 from functools import wraps
 
-def print_debug(data_list,info="[empty]", num_elements=1):
+def print_debug(data_list,info="[empty]", num_elements=5):
     if num_elements > len(data_list):
         print(f"Requested {num_elements} elements, but the list only has {len(data_list)}.")
         num_elements = len(data_list)  # Limit to the size of the list
@@ -34,6 +33,7 @@ def to_binary(one_hot):
 
 def to_one_hot(binary: int, len_labels) -> np.ndarray:
     """ Encode the label into one-hot format. """
+    #print(binary)
     res = np.zeros(len_labels, dtype=int)
     res[binary] = 1
     return res
@@ -45,6 +45,13 @@ def divide_binary(data):
     # FORMAT: [1.] [1.] [1.] [2.] [3.]
     y = dfs[1]
     return X, y
+
+def divide_binary_dynamic(data):
+    data = np.array(data)  # Convert data to a NumPy array
+    X = data[:, :-1]  # All columns except the last one
+    y = data[:, -1]   # Only the last column
+    return X, y
+
 
 
 def divide_one_hot(data):

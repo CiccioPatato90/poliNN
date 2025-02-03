@@ -4,9 +4,11 @@ eval/
 res/k_means.csv
 res/processed_data.csv
 records.db
-__pycache__/
+./__pycache__/
 .venv/
 main_2.L.py
 netdebugger-r51/
 netdebugger/
 __pycache__/
+.ipynb_checkpoints/
+random_engines/

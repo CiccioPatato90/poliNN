@@ -136,8 +136,14 @@ class Data:
             # Pickle dump the updated data instance
             
     
-    def sklearn_split(self, db : Database, test_size=0.8, random=False, debug=True, cache_dir=NO_OUTLIERS_CACHE_DIR):
-        X, y = db.fetch_all_divide()
+    def sklearn_split(self, db : Database, test_size=0.8, random=False, debug=True, cache_dir=NO_OUTLIERS_CACHE_DIR, is_less = False):
+        if is_less:
+            X, y = db.fetch_some_divide()
+        else:
+            X, y = db.fetch_all_divide()
+
+        ut.print_debug(X, info="X", num_elements=3)
+        ut.print_debug(y, info="y", num_elements=3)
 
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, stratify=y,random_state=42)    
 
@@ -162,24 +168,6 @@ class Data:
                 self.reconstruct_and_save_records(X_test, y_test, cache_dir, db, dataset_type="test", data_instance=data_instance)
                 #exit()
                 data_instance.pickle_dump(cache_dir)
-
-            """
-            record_train = np.empty((len(X_train), X_train.shape[1] + 1))
-            for idx, (record, label_binary) in enumerate(zip(X_train, y_train)):
-                record_train[idx] = np.concatenate((record, [int(label_binary)]))
-            ut.print_debug(record_train, info="reconstructed_train", num_elements=30)
-            db.save_train_records(record_train)
-            with open(cache_dir, 'rb') as f:
-                data_instance: Data = pickle.load(f)
-                for label in self.cluster_labels:
-                    cluster_train = db.fetch_train_cluster()
-                    data_instance.train_values.values_dict[int(label)].cluster_one_hot = ut.to_one_hot(label, len(self.cluster_labels))
-                    data_instance.train_values.values_dict[int(label)].cluster_binary = label
-                    data_instance.train_values.values_dict[int(label)].total = len(cluster_train)
-                    data_instance.train_values.values_dict[int(label)].values = np.array(cluster_train)
-                    # possible addition of metadata object on the train/test dictionaries as well
-                    data_instance.pickle_dump(cache_dir)
-            """
         
 
     def split(self, proportion=0.5,cache_dir = CACHE_DIR,verbose=False):
